@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Financial Modelling Assistant</title>
+<style>
+  :root { --ink:#14202b; --muted:#5a6772; --bg:#eef1f5; --card:#fff; --line:#d5dbe2; --navy:#13294b; --teal:#0b7a75; --teal-soft:#dff1ef; --amber:#8a5a00; --amber-soft:#fff1d0; --red:#9b2c2c; --red-soft:#fbe7e7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { background:var(--navy); color:#fff; padding:26px 18px; }
+  header div { max-width:1080px; margin:0 auto; }
+  h1 { font:700 27px/1.2 Georgia,serif; margin:0 0 6px; }
+  header p { margin:0; color:#c9d4e6; max-width:70ch; }
+  main { max-width:1080px; margin:0 auto; padding:22px 18px 60px; }
+  h2 { font:700 19px/1.3 Georgia,serif; margin:0 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:18px; margin-bottom:18px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  th { font-size:13px; color:var(--muted); white-space:nowrap; }
+  .n { text-align:right; }
+  input,select { font:inherit; padding:7px 8px; border:1px solid #a8b2bc; border-radius:4px; width:100%; background:#fff; color:var(--ink); }
+  input[type=number] { text-align:right; }
+  input:focus-visible,select:focus-visible,button:focus-visible { outline:3px solid #86c9c5; outline-offset:1px; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px 14px; margin-bottom:6px; }
+  .grid label { display:block; font-size:13px; color:var(--muted); margin-bottom:3px; }
+  .grid .wide { grid-column:span 2; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+  button { font:inherit; font-weight:600; padding:9px 16px; border-radius:4px; cursor:pointer; border:1px solid var(--teal); background:#fff; color:var(--teal); }
+  button.main { background:var(--teal); color:#fff; }
+  button:disabled { opacity:.6; cursor:progress; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .tabs button { padding:6px 14px; }
+  .tabs button.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+  #status { min-height:1.5em; margin:10px 0 0; color:var(--muted); }
+  #status.err { color:var(--red); }
+  .note { color:var(--muted); font-size:14px; margin:10px 0 0; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:3px; font-size:13px; font-weight:600; }
+  .pill.ok { background:var(--teal-soft); color:var(--teal); }
+  .pill.flag { background:var(--amber-soft); color:var(--amber); }
+  .alert { background:var(--red-soft); color:var(--red); padding:10px 12px; border-radius:4px; margin-bottom:12px; font-weight:600; }
+  ul.checks { list-style:none; margin:0; padding:0; }
+  ul.checks li { padding:8px 0; border-bottom:1px solid var(--line); }
+  .detail { display:block; color:var(--muted); font-size:14px; }
+  td.mid { background:var(--teal-soft); font-weight:700; }
+  .text { white-space:pre-wrap; max-width:74ch; }
+  .sub { font-weight:600; color:var(--navy); }
+  @media (max-width:720px) { .grid { grid-template-columns:1fr 1fr; } .grid .wide { grid-column:span 2; } h1 { font-size:22px; } button.main { width:100%; } }
+</style>
+</head>
+<body>
+<header><div>
+  <h1>Financial Modelling Assistant</h1>
+  <p>Enter your base-year figures and assumptions. The app builds a five-year forecast, three scenarios, a DCF valuation and a sensitivity grid. All numbers are calculated in code. Claude then interprets the results using a written Skill (SKILL.md).</p>
+</div></header>
+<main>
+  <section class="card">
+    <h2>1. Company and general inputs</h2>
+    <div class="grid">
+      <div class="wide"><label for="company">Company name (optional)</label><input id="company" maxlength="80"></div>
+      <div class="wide"><label for="unit">Unit of the figures</label>
+        <select id="unit"><option>Rs crore</option><option>Rs lakhs</option><option>Rs millions</option><option>Rs thousands</option><option>Rs</option></select></div>
+      <div><label for="baseRevenue">Base-year revenue</label><input id="baseRevenue" type="number" step="any"></div>
+      <div><label for="baseEbitda">Base-year EBITDA</label><input id="baseEbitda" type="number" step="any"></div>
+      <div><label for="depreciation">Depreciation (% of revenue)</label><input id="depreciation" type="number" step="any"></div>
+      <div><label for="tax">Tax rate (%)</label><input id="tax" type="number" step="any"></div>
+      <div><label for="wacc">Discount rate, WACC (%)</label><input id="wacc" type="number" step="any"></div>
+      <div><label for="terminalGrowth">Terminal growth (%)</label><input id="terminalGrowth" type="number" step="any"></div>
+      <div><label for="netDebt">Net debt</label><input id="netDebt" type="number" step="any"></div>
+      <div><label for="shares">Number of shares (optional)</label><input id="shares" type="number" step="any"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Scenario assumptions (applied to each of the five years)</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Assumption</th><th class="n">Base</th><th class="n">Optimistic</th><th class="n">Pessimistic</th></tr></thead>
+      <tbody id="scen"></tbody>
+    </table></div>
+    <div class="row">
+      <button type="button" id="run" class="main">Build the model</button>
+      <button type="button" id="sample">Load sample figures</button>
+      <button type="button" id="clear">Clear all</button>
+    </div>
+    <p id="status" role="status"></p>
+    <p class="note">The sample figures are for a fictional company. Cash flows are discounted at year end. Working capital is assumed to stay at a fixed percentage of revenue.</p>
+  </section>
+
+  <section id="results" hidden>
+    <div class="card"><h2>Model checks</h2><div id="checks"></div></div>
+    <div class="card"><h2>Scenario comparison</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Measure</th><th class="n">Pessimistic</th><th class="n">Base</th><th class="n">Optimistic</th></tr></thead>
+        <tbody id="cmp"></tbody></table></div>
+      <p class="note">Valuation figures depend entirely on the assumptions entered. They are not predictions or price targets.</p></div>
+    <div class="card"><h2>Five-year forecast</h2>
+      <div class="tabs" id="tabs"></div>
+      <div class="scroll"><table>
+        <thead><tr id="fh"></tr></thead><tbody id="fb"></tbody></table></div></div>
+    <div class="card"><h2>Sensitivity: base-case equity value</h2>
+      <div class="scroll"><table id="sens"></table></div>
+      <p class="note" id="sensnote"></p></div>
+    <div class="card"><h2>Interpretation</h2><div id="text" class="text"></div></div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const GEN = ["baseRevenue","baseEbitda","depreciation","tax","wacc","terminalGrowth","netDebt","shares"];
+  const SC = [["growth","Revenue growth (%)"],["margin","EBITDA margin (%)"],["capex","Capex (% of revenue)"],["nwc","Working capital (% of revenue)"]];
+  const NAMES = ["base","optimistic","pessimistic"];
+  const SAMPLE = { company:"Sample Industries Ltd (fictional)", unit:"Rs crore", baseRevenue:500, baseEbitda:90, depreciation:4, tax:25, wacc:11, terminalGrowth:4, netDebt:120, shares:10,
+    base:{growth:10,margin:18,capex:5,nwc:12}, optimistic:{growth:14,margin:20,capex:5,nwc:11}, pessimistic:{growth:5,margin:15,capex:5,nwc:13} };
+  const n2 = (n) => Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+  // build scenario table
+  const body = $("scen");
+  SC.forEach(([k, label]) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("td"); th.textContent = label; tr.appendChild(th);
+    NAMES.forEach((s) => { const td = document.createElement("td"); const i = document.createElement("input"); i.type = "number"; i.step = "any"; i.id = s + "_" + k; i.setAttribute("aria-label", label + " " + s); td.appendChild(i); tr.appendChild(td); });
+    body.appendChild(tr);
+  });
+  function fill(d) {
+    $("company").value = d ? d.company : ""; $("unit").value = d ? d.unit : "Rs crore";
+    GEN.forEach((k) => { $(k).value = d ? d[k] : ""; });
+    NAMES.forEach((s) => SC.forEach(([k]) => { $(s + "_" + k).value = d ? d[s][k] : ""; }));
+  }
+  fill(SAMPLE);
+  $("sample").addEventListener("click", () => fill(SAMPLE));
+  $("clear").addEventListener("click", () => fill(null));
+
+  function cell(tr, text, cls) { const td = document.createElement("td"); if (cls) td.className = cls; td.textContent = text; tr.appendChild(td); return td; }
+  const val = (v) => v === null || v === undefined ? "Not defined" : n2(v);
+  let DATA = null;
+
+  function showForecast(name) {
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.s === name));
+    const years = DATA.scenarios[name].years;
+    const head = $("fh"); head.textContent = "";
+    const h0 = document.createElement("th"); h0.textContent = "Item"; head.appendChild(h0);
+    years.forEach((y) => { const th = document.createElement("th"); th.className = "n"; th.textContent = "Year " + y.year; head.appendChild(th); });
+    const rows = [["Revenue","revenue"],["EBITDA","ebitda"],["Depreciation","depreciation"],["EBIT","ebit"],["Tax","tax"],["NOPAT","nopat"],["Capex","capex"],["Change in working capital","changeInWorkingCapital"],["Free cash flow","fcf"],["Discount factor","discountFactor"],["Present value of FCF","pvFcf"]];
+    const fb = $("fb"); fb.textContent = "";
+    rows.forEach(([label, key]) => {
+      const tr = document.createElement("tr");
+      const l = cell(tr, label); if (key === "fcf") l.className = "sub";
+      years.forEach((y) => cell(tr, key === "discountFactor" ? Number(y[key]).toFixed(4) : n2(y[key]), "n"));
+      fb.appendChild(tr);
+    });
+  }
+
+  function render(d) {
+    DATA = d;
+    // checks
+    const ch = $("checks"); ch.textContent = "";
+    const flagged = d.checks.filter((c) => c.status === "flag");
+    if (flagged.length) { const a = document.createElement("div"); a.className = "alert"; a.textContent = flagged.length + " check(s) flagged. Review these assumptions before relying on the results."; ch.appendChild(a); }
+    const ul = document.createElement("ul"); ul.className = "checks";
+    d.checks.forEach((c) => {
+      const li = document.createElement("li"); const p = document.createElement("span"); p.className = "pill " + c.status; p.textContent = c.status === "ok" ? "OK" : "Flagged";
+      li.appendChild(p); li.appendChild(document.createTextNode(" " + c.name));
+      const dt = document.createElement("span"); dt.className = "detail"; dt.textContent = c.detail; li.appendChild(dt); ul.appendChild(li);
+    });
+    ch.appendChild(ul);
+
+    // scenario comparison
+    const order = ["pessimistic", "base", "optimistic"], s = d.scenarios, u = d.unit;
+    const lines = [
+      ["Revenue CAGR (5 years)", "revenueCagr", "%"], ["Year-5 EBITDA margin", "year5EbitdaMargin", "%"], ["Year-5 free cash flow (" + u + ")", "year5Fcf", ""],
+      ["Sum of PV of FCF (" + u + ")", "sumPvFcf", ""], ["PV of terminal value (" + u + ")", "pvTerminalValue", ""],
+      ["Enterprise value (" + u + ")", "enterpriseValue", ""], ["Equity value (" + u + ")", "equityValue", ""], ["Value per share", "valuePerShare", ""],
+      ["Terminal value share of EV", "terminalShareOfEv", "%"], ["Implied EV / base-year EBITDA", "impliedEvToBaseEbitda", "x"]
+    ];
+    const cmp = $("cmp"); cmp.textContent = "";
+    lines.forEach(([label, key, suf]) => {
+      const tr = document.createElement("tr"); cell(tr, label);
+      order.forEach((o) => { const v = s[o][key]; const td = cell(tr, v === null ? (s[o].notDefinedReason ? "Not defined" : "-") : n2(v) + suf, "n"); if (v === null && s[o].notDefinedReason) td.title = s[o].notDefinedReason; });
+      cmp.appendChild(tr);
+    });
+
+    // forecast tabs
+    const tabs = $("tabs"); tabs.textContent = "";
+    ["base", "optimistic", "pessimistic"].forEach((name) => {
+      const b = document.createElement("button"); b.type = "button"; b.dataset.s = name; b.textContent = name[0].toUpperCase() + name.slice(1);
+      b.addEventListener("click", () => showForecast(name)); tabs.appendChild(b);
+    });
+    showForecast("base");
+
+    // sensitivity
+    const t = $("sens"); t.textContent = "";
+    const sens = d.sensitivity;
+    const hr = document.createElement("tr"); const corner = document.createElement("th"); corner.textContent = "WACC % \\ Revenue growth %"; hr.appendChild(corner);
+    sens.cols.forEach((c) => { const th = document.createElement("th"); th.className = "n"; th.textContent = c + "%"; hr.appendChild(th); });
+    t.appendChild(hr);
+    sens.grid.forEach((row, i) => {
+      const tr = document.createElement("tr"); const l = document.createElement("th"); l.textContent = sens.rows[i] + "%"; tr.appendChild(l);
+      row.forEach((v, j) => { const td = cell(tr, v === null ? "n/a" : n2(v), "n"); if (i === 2 && j === 2) td.className = "n mid"; });
+      t.appendChild(tr);
+    });
+    $("sensnote").textContent = "Equity value in " + u + ". The shaded cell is the base case. Growth is shifted by the same number of points in every year. n/a means the discount rate is not above terminal growth or the terminal value is not meaningful.";
+
+    // commentary
+    const tx = $("text"); tx.textContent = "";
+    if (d.commentarySource === "backup") {
+      const a = document.createElement("div"); a.className = "alert";
+      a.textContent = "Claude interpretation is unavailable (" + (d.commentaryError || "unknown reason") + "). The text below was written by code from the calculated results.";
+      tx.appendChild(a);
+    }
+    tx.appendChild(document.createTextNode(d.commentary));
+    $("results").hidden = false; $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("run").addEventListener("click", async () => {
+    const st = $("status"), btn = $("run");
+    st.className = ""; st.textContent = "Building the model and writing the interpretation..."; btn.disabled = true;
+    try {
+      const payload = { company: $("company").value, unit: $("unit").value, scenarios: {} };
+      GEN.forEach((k) => { payload[k] = $(k).value; });
+      NAMES.forEach((s) => { payload.scenarios[s] = {}; SC.forEach(([k]) => { payload.scenarios[s][k] = $(s + "_" + k).value; }); });
+      const resp = await fetch("/api/model", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Something went wrong.");
+      st.textContent = ""; render(data);
+    } catch (e) { st.className = "err"; st.textContent = e.message; }
+    finally { btn.disabled = false; }
+  });
+</script>
+</body>
+</html>
